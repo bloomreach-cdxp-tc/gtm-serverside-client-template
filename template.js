@@ -19,8 +19,8 @@ const setResponseStatus = require("setResponseStatus");
 const getContainerVersion = require("getContainerVersion");
 const getRemoteAddress = require("getRemoteAddress");
 const path = getRequestPath();
-const getType = require('getType');
-
+const getType = require("getType");
+const Object = require("Object");
 
 // Check if this Client should serve exponea.js file
 if (path === data.proxyJsFilePath) {
@@ -64,7 +64,7 @@ const validPaths = [
 	"/webxp/bandits/reward",
 	"/webxp/script-async/",
 	"/webxp/script/",
-    "/editor",
+	"/editor",
 ];
 
 let isValidPath = false;
@@ -101,40 +101,61 @@ if (!isValidPath) {
 		RequestHeaders: requestHeaders,
 		RequestBody: requestBody,
 	});
-	sendHttpRequest(requestUrl, { method: requestMethod, headers: requestHeaders }, requestBody).then((result) => {
-		log({
-			Name: "Exponea",
-			Type: "Response",
-			TraceId: traceId,
-			ResponseStatusCode: result.statusCode,
-			ResponseHeaders: result.headers,
-			ResponseBody: result.body,
-		});
+	const response = sendHttpRequest(requestUrl, { method: requestMethod, headers: requestHeaders }, requestBody);
 
-		for (const key in result.headers) {
-			if (key === "set-cookie") {
-				setResponseCookies(result.headers[key]);
-			} else {
-				setResponseHeader(key, result.headers[key]);
+	response
+		.then((result) => {
+			log({
+				Name: "Exponea",
+				Type: "Received Response",
+				TraceId: traceId,
+				ResponseStatusCode: result.statusCode,
+				ResponseHeaders: result.headers,
+				ResponseBody: result.body,
+			});
+
+			// if transfer-encoding header is present in the response, remove it to avoid problems as it's a hop-by-hop header
+           		Object.delete(result.headers, "transfer-encoding");
+
+			for (const key in result.headers) {
+				if (key === "set-cookie") {
+					setResponseCookies(result.headers[key]);
+				} else {
+					setResponseHeader(key, result.headers[key]);
+				}
 			}
-		}
 
+			// Access-Control-Request-Headers header is now sent with the modifications data request, which will fail unless Access-Control-Request-Headers is set
+			if (requestHeaders["Access-Control-Request-Headers"]) {
+				setResponseHeader("Access-Control-Allow-Headers", requestHeaders["Access-Control-Request-Headers"]);
+			}
 
-        // Access-Control-Request-Headers header is now sent with the modifications data request, which will fail unless Access-Control-Request-Headers is set
-        if (requestHeaders["Access-Control-Request-Headers"]) {
-			setResponseHeader("Access-Control-Allow-Headers", requestHeaders["Access-Control-Request-Headers"]);
-		}
+			setResponseBody(result.body || "");
 
-		setResponseBody(result.body || "");
-		setResponseStatus(result.statusCode);
+			setResponseStatus(result.statusCode);
+			
+			if (requestOrigin) {
+				setResponseHeader("access-control-allow-origin", requestOrigin);
+				setResponseHeader("access-control-allow-credentials", "true");
+			}
 
-		if (requestOrigin) {
-			setResponseHeader("access-control-allow-origin", requestOrigin);
-			setResponseHeader("access-control-allow-credentials", "true");
-		}
+			log({
+				Name: "Exponea",
+				Type: "Updated Response",
+				TraceId: traceId,
+				ResponseStatusCode: result.statusCode,
+				ResponseHeaders: result.headers,
+				ResponseBody: result.body,
+			});
 
-		returnResponse();
-	});
+			returnResponse();
+		})
+		.catch((rejectedValue) => {
+			log({
+				Type: "Promise was rejected",
+				Message: rejectedValue,
+			});
+		});
 }
 
 function generateRequestUrl() {
@@ -207,6 +228,11 @@ function sendProxyResponse(response, headers, statusCode) {
 function determinateIsLoggingEnabled() {
 	const containerVersion = getContainerVersion();
 	const isDebug = containerVersion.debugMode;
+
+	if (path !== "/campaigns/banners/show") {
+		return false;
+	}
+
 	if (!data.logType) {
 		return isDebug;
 	}
@@ -244,14 +270,6 @@ function equalOrStartsOrEnds(string, substring, withWildcard) {
 	const containWildcard = substring.indexOf("*") > -1;
 	const eq = string === substring;
 	if (eq) return true;
-	log({
-		Name: "Exponea",
-		Type: "EqualOrStartsOrEnds",
-		string: string,
-		substring: substring,
-		withWildcard: withWildcard,
-		containWildcard: containWildcard,
-	});
 	if (!withWildcard || !containWildcard) {
 		return startsWith(string, substring) || endsWith(string, substring);
 	} else {
