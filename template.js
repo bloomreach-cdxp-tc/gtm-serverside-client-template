@@ -22,7 +22,7 @@ const path = getRequestPath();
 const getType = require("getType");
 const Object = require("Object");
 
-// Check if this Client should serve exponea.js file
+// Check if this Client should serve Bloomreach JS SDK (brweb.min.js)
 if (path === data.proxyJsFilePath) {
 	claimRequest();
 
@@ -30,36 +30,37 @@ if (path === data.proxyJsFilePath) {
 	const thirty_minutes_ago = now - 30 * 60 * 1000;
 
 	// save js sdk to server cache if it's not been done yet
-	if (templateDataStorage.getItemCopy("exponea_js") == null || templateDataStorage.getItemCopy("exponea_stored_at") < thirty_minutes_ago) {
-		sendHttpGet(data.targetAPI + "/js/exponea.min.js", { headers: { "X-Forwarded-For": getRemoteAddress() } }).then((result) => {
+	if (templateDataStorage.getItemCopy("bloomreach_js") == null || templateDataStorage.getItemCopy("bloomreach_stored_at") < thirty_minutes_ago) {
+		sendHttpGet(data.targetAPI + data.proxyJsFilePath, { headers: { "X-Forwarded-For": getRemoteAddress() } }).then((result) => {
 			if (result.statusCode === 200) {
-				templateDataStorage.setItemCopy("exponea_js", result.body);
-				templateDataStorage.setItemCopy("exponea_headers", result.headers);
-				templateDataStorage.setItemCopy("exponea_stored_at", now);
+				templateDataStorage.setItemCopy("bloomreach_js", result.body);
+				templateDataStorage.setItemCopy("bloomreach_headers", result.headers);
+				templateDataStorage.setItemCopy("bloomreach_stored_at", now);
 			}
 			sendProxyResponse(result.body, result.headers, result.statusCode);
 		});
 	} else {
-		sendProxyResponse(templateDataStorage.getItemCopy("exponea_js"), templateDataStorage.getItemCopy("exponea_headers"), 200);
+		sendProxyResponse(templateDataStorage.getItemCopy("bloomreach_js"), templateDataStorage.getItemCopy("bloomreach_headers"), 200);
 	}
 }
 
-// Check if this Client should serve exponea.js.map file (Just only to avoid annoying error in console)
-if (path === "/exponea.min.js.map") {
+// Serve a stub source map to avoid console errors when SDK requests .js.map
+if (path === data.proxyJsFilePath + ".map") {
 	sendProxyResponse('{"version": 1, "mappings": "", "sources": [], "names": [], "file": ""}', { "Content-Type": "application/json" }, 200);
 }
 
-const cookieWhiteList = ["xnpe_" + data.projectToken, "__exponea_etc__", "__exponea_time2__"];
+const cookieWhiteList = ["__exponea_etc__", "__exponea_time2__"];
+const cookiePrefixWhiteList = ["xnpe_"];
 const headerWhiteList = ["referer", "user-agent", "etag", "Access-Control-Request-Headers"];
 
 const validPaths = [
-	"/bulk",
+	"/track/u/v1/batch",
+	"/webxp/streams/",
 	"/managed-tags/show",
 	"/campaigns/banners/show",
 	"/campaigns/experiments/show",
 	"/campaigns/html/get",
 	"/optimization/recommend/user",
-	"/webxp/projects/",
 	"/webxp/data/modifications/",
 	"/webxp/bandits/reward",
 	"/webxp/script-async/",
@@ -72,7 +73,7 @@ let isValidPath = false;
 // Check if this Client should claim request
 if (validPaths.reduce((res, validPath) => res || equalOrStartsOrEnds(path, validPath, true), false)) {
 	log({
-		Name: "Exponea",
+		Name: "Bloomreach",
 		Type: "Valid path",
 		path: path,
 	});
@@ -92,7 +93,7 @@ if (!isValidPath) {
 	const requestHeaders = generateRequestHeaders();
 
 	log({
-		Name: "Exponea",
+		Name: "Bloomreach",
 		Type: "Request",
 		TraceId: traceId,
 		RequestOrigin: requestOrigin,
@@ -106,7 +107,7 @@ if (!isValidPath) {
 	response
 		.then((result) => {
 			log({
-				Name: "Exponea",
+				Name: "Bloomreach",
 				Type: "Received Response",
 				TraceId: traceId,
 				ResponseStatusCode: result.statusCode,
@@ -140,7 +141,7 @@ if (!isValidPath) {
 			}
 
 			log({
-				Name: "Exponea",
+				Name: "Bloomreach",
 				Type: "Updated Response",
 				TraceId: traceId,
 				ResponseStatusCode: result.statusCode,
@@ -191,6 +192,25 @@ function generateRequestHeaders() {
 		}
 	}
 
+	// Include any cookie whose name starts with a prefix in cookiePrefixWhiteList
+	const cookieHeader = getRequestHeader("cookie");
+	if (cookieHeader) {
+		const pairs = cookieHeader.split(";");
+		for (let i = 0; i < pairs.length; i++) {
+			const eqIndex = pairs[i].indexOf("=");
+			if (eqIndex > -1) {
+				const name = pairs[i].slice(0, eqIndex).trim();
+				const value = pairs[i].slice(eqIndex + 1).trim();
+				for (let j = 0; j < cookiePrefixWhiteList.length; j++) {
+					if (name.indexOf(cookiePrefixWhiteList[j]) === 0) {
+						cookies.push(name + "=" + value);
+						break;
+					}
+				}
+			}
+		}
+	}
+
 	headers.cookie = cookies.join("; ");
 	headers["X-Forwarded-For"] = getRemoteAddress();
 
@@ -229,7 +249,7 @@ function determinateIsLoggingEnabled() {
 	const containerVersion = getContainerVersion();
 	const isDebug = containerVersion.debugMode;
 
-	if (path !== "/campaigns/banners/show") {
+	if (path !== "/campaigns/banners/show" && !startsWith(path, "/webxp/streams/")) {
 		return false;
 	}
 
