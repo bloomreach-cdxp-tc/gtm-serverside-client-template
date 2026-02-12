@@ -1,4 +1,4 @@
-﻿___TERMS_OF_SERVICE___
+___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -13,13 +13,13 @@ ___INFO___
   "id": "cvt_temp_public_id",
   "version": 1,
   "securityGroups": [],
-  "displayName": "Exponea Analytics Client",
+  "displayName": "Bloomreach Analytics Client",
   "brand": {
     "id": "brand_dummy",
     "displayName": "",
     "thumbnail": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAM1BMVEX/zQAcFzP/0gAAADSohyH/1gClhCL/zwAAADehgSPWrBWwjSD/2wAPDTSsiiD/3wBxWyvoA5xkAAABPUlEQVR4nO3cW26DMBRF0WAgDSWPzn+0/bdV0JUq2TdZawTeUfIBB3K5AAAAAAAAAAAAAAAAAAAAwLjWqNL7xEHrbY65bckS13mKmReFg1GocHwKFY5PocLxKVQ4vqbwcXb5dE1e+Ph5Loeu31+9zxxTF87PtRxLFtgWZvuZnVKYn8L8FOanMD+F+SnM7/0KS7V3vurC/Z57IS1bvYhOlewLaVmi92WaT2Dwr7FChQr7U6hQYX8KFSrs7xMLg4+XDr+QNoXzfjyIpltI28L7ySCabSFtC9feR/pnCvNTmJ/C/BTmpzA/hfm9YWE1b973uvCV/B3S9hXRqRK9xB9tIQ0/qH5qtPs0ChUq7E+hQoX9KVSosL8PKIz+wc65wRbSsgUH0HwLaXT/TL+QAgAAAAAAAAAAAAAAAAAA/O0Xm1MdrfEGnRgAAAAASUVORK5CYII\u003d"
   },
-  "description": "Exponea helps you maximize profits and drive customer loyalty by targeting the right customers with the right message at the perfect time.",
+  "description": "Bloomreach (Exponea) client for GTM Server. Forwards requests from the Bloomreach brweb.js SDK using stream_id.",
   "containerContexts": [
     "SERVER"
   ]
@@ -31,8 +31,8 @@ ___TEMPLATE_PARAMETERS___
 [
   {
     "type": "TEXT",
-    "name": "projectToken",
-    "displayName": "Project token",
+    "name": "streamId",
+    "displayName": "Stream ID",
     "simpleValueType": true,
     "valueValidators": [
       {
@@ -54,14 +54,14 @@ ___TEMPLATE_PARAMETERS___
   {
     "type": "TEXT",
     "name": "proxyJsFilePath",
-    "displayName": "A path that will be used for the exponea.js serving",
+    "displayName": "Path used to serve the Bloomreach JS SDK (brweb.min.js)",
     "simpleValueType": true,
     "valueValidators": [
       {
         "type": "NON_EMPTY"
       }
     ],
-    "defaultValue": "/js/exponea.min.js"
+    "defaultValue": "/js/brweb.min.js"
   },
   {
     "type": "GROUP",
@@ -120,7 +120,7 @@ const path = getRequestPath();
 const getType = require("getType");
 const Object = require("Object");
 
-// Check if this Client should serve exponea.js file
+// Check if this Client should serve Bloomreach JS SDK (brweb.min.js)
 if (path === data.proxyJsFilePath) {
 	claimRequest();
 
@@ -128,36 +128,36 @@ if (path === data.proxyJsFilePath) {
 	const thirty_minutes_ago = now - 30 * 60 * 1000;
 
 	// save js sdk to server cache if it's not been done yet
-	if (templateDataStorage.getItemCopy("exponea_js") == null || templateDataStorage.getItemCopy("exponea_stored_at") < thirty_minutes_ago) {
-		sendHttpGet(data.targetAPI + "/js/exponea.min.js", { headers: { "X-Forwarded-For": getRemoteAddress() } }).then((result) => {
+	if (templateDataStorage.getItemCopy("bloomreach_js") == null || templateDataStorage.getItemCopy("bloomreach_stored_at") < thirty_minutes_ago) {
+		sendHttpGet(data.targetAPI + data.proxyJsFilePath, { headers: { "X-Forwarded-For": getRemoteAddress() } }).then((result) => {
 			if (result.statusCode === 200) {
-				templateDataStorage.setItemCopy("exponea_js", result.body);
-				templateDataStorage.setItemCopy("exponea_headers", result.headers);
-				templateDataStorage.setItemCopy("exponea_stored_at", now);
+				templateDataStorage.setItemCopy("bloomreach_js", result.body);
+				templateDataStorage.setItemCopy("bloomreach_headers", result.headers);
+				templateDataStorage.setItemCopy("bloomreach_stored_at", now);
 			}
 			sendProxyResponse(result.body, result.headers, result.statusCode);
 		});
 	} else {
-		sendProxyResponse(templateDataStorage.getItemCopy("exponea_js"), templateDataStorage.getItemCopy("exponea_headers"), 200);
+		sendProxyResponse(templateDataStorage.getItemCopy("bloomreach_js"), templateDataStorage.getItemCopy("bloomreach_headers"), 200);
 	}
 }
 
-// Check if this Client should serve exponea.js.map file (Just only to avoid annoying error in console)
-if (path === "/exponea.min.js.map") {
+// Serve a stub source map to avoid console errors when SDK requests .js.map
+if (path === data.proxyJsFilePath + ".map") {
 	sendProxyResponse('{"version": 1, "mappings": "", "sources": [], "names": [], "file": ""}', { "Content-Type": "application/json" }, 200);
 }
 
-const cookieWhiteList = ["xnpe_" + data.projectToken, "__exponea_etc__", "__exponea_time2__"];
+const cookieWhiteList = ["xnpe_" + data.streamId, "__exponea_etc__", "__exponea_time2__"];
 const headerWhiteList = ["referer", "user-agent", "etag", "Access-Control-Request-Headers"];
 
 const validPaths = [
-	"/bulk",
+	"/track/u/v1/batch",
+	"/webxp/streams/",
 	"/managed-tags/show",
 	"/campaigns/banners/show",
 	"/campaigns/experiments/show",
 	"/campaigns/html/get",
 	"/optimization/recommend/user",
-	"/webxp/projects/",
 	"/webxp/data/modifications/",
 	"/webxp/bandits/reward",
 	"/webxp/script-async/",
@@ -170,7 +170,7 @@ let isValidPath = false;
 // Check if this Client should claim request
 if (validPaths.reduce((res, validPath) => res || equalOrStartsOrEnds(path, validPath, true), false)) {
 	log({
-		Name: "Exponea",
+		Name: "Bloomreach",
 		Type: "Valid path",
 		path: path,
 	});
@@ -190,7 +190,7 @@ if (!isValidPath) {
 	const requestHeaders = generateRequestHeaders();
 
 	log({
-		Name: "Exponea",
+		Name: "Bloomreach",
 		Type: "Request",
 		TraceId: traceId,
 		RequestOrigin: requestOrigin,
@@ -204,7 +204,7 @@ if (!isValidPath) {
 	response
 		.then((result) => {
 			log({
-				Name: "Exponea",
+				Name: "Bloomreach",
 				Type: "Received Response",
 				TraceId: traceId,
 				ResponseStatusCode: result.statusCode,
@@ -238,7 +238,7 @@ if (!isValidPath) {
 			}
 
 			log({
-				Name: "Exponea",
+				Name: "Bloomreach",
 				Type: "Updated Response",
 				TraceId: traceId,
 				ResponseStatusCode: result.statusCode,
@@ -327,7 +327,7 @@ function determinateIsLoggingEnabled() {
 	const containerVersion = getContainerVersion();
 	const isDebug = containerVersion.debugMode;
 
-	if (path !== "/campaigns/banners/show") {
+	if (path !== "/campaigns/banners/show" && !startsWith(path, "/webxp/streams/")) {
 		return false;
 	}
 
