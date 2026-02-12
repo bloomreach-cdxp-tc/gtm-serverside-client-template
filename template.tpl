@@ -147,7 +147,8 @@ if (path === data.proxyJsFilePath + ".map") {
 	sendProxyResponse('{"version": 1, "mappings": "", "sources": [], "names": [], "file": ""}', { "Content-Type": "application/json" }, 200);
 }
 
-const cookieWhiteList = ["xnpe_" + data.streamId, "__exponea_etc__", "__exponea_time2__"];
+const cookieWhiteList = ["__exponea_etc__", "__exponea_time2__"];
+const cookiePrefixWhiteList = ["xnpe_"];
 const headerWhiteList = ["referer", "user-agent", "etag", "Access-Control-Request-Headers"];
 
 const validPaths = [
@@ -286,6 +287,25 @@ function generateRequestHeaders() {
 
 		if (cookieValue && cookieValue.length) {
 			cookies.push(cookieName + "=" + cookieValue[0]);
+		}
+	}
+
+	// Include any cookie whose name starts with a prefix in cookiePrefixWhiteList
+	const cookieHeader = getRequestHeader("cookie");
+	if (cookieHeader) {
+		const pairs = cookieHeader.split(";");
+		for (let i = 0; i < pairs.length; i++) {
+			const eqIndex = pairs[i].indexOf("=");
+			if (eqIndex > -1) {
+				const name = pairs[i].slice(0, eqIndex).trim();
+				const value = pairs[i].slice(eqIndex + 1).trim();
+				for (let j = 0; j < cookiePrefixWhiteList.length; j++) {
+					if (name.indexOf(cookiePrefixWhiteList[j]) === 0) {
+						cookies.push(name + "=" + value);
+						break;
+					}
+				}
+			}
 		}
 	}
 
