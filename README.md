@@ -13,6 +13,18 @@ We are providing the templates for technically advanced customers who understand
 Bloomreach does not currently provide production-level support for any kind of usage of this template.
 
 
+## Versions
+
+This repository maintains two release lines, one per integration approach:
+
+| Integration | Branch | Tags |
+|---|---|---|
+| **Data Hub** (stream ID) — current Bloomreach approach | `main` | `v1.x` |
+| **Engagement project** (project token) — older approach | `legacy/v0` | `v0.x` |
+
+Use the latest tag of the line matching your integration. Fixes that apply to both are committed to each branch separately.
+
+
 ## Useful links
 
 - https://docs.exponea.com/docs/1st-party-cookie-tracking-solutions#2-google-tag-manager-server-side-solution

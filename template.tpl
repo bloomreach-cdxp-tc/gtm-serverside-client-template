@@ -149,7 +149,7 @@ if (path === data.proxyJsFilePath + ".map") {
 
 const cookieWhiteList = ["__exponea_etc__", "__exponea_time2__"];
 const cookiePrefixWhiteList = ["xnpe_"];
-const headerWhiteList = ["referer", "user-agent", "etag", "Access-Control-Request-Headers"];
+const headerWhiteList = ["referer", "user-agent", "etag", "content-type", "Access-Control-Request-Headers"];
 
 const validPaths = [
 	"/track/u/v1/batch",
@@ -164,6 +164,7 @@ const validPaths = [
 	"/webxp/script-async/",
 	"/webxp/script/",
 	"/editor",
+	"/data/webxp/campaigns/experiments/editor-params/verify",
 ];
 
 let isValidPath = false;
